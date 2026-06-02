@@ -1,0 +1,164 @@
+version: 2
+
+sources:
+  - name: churn_db
+    description: "Raw Telco customer data loaded from the IBM Watson Telco Customer Churn dataset.
+      Each row represents one customer's subscription state and whether they churned."
+    database: churn_db
+    schema: public
+    tables:
+      - name: customers
+        description: Raw customer records with service subscriptions and churn labels.
+        columns:
+          - name: customerID
+            description: Unique customer identifier.
+            tests:
+              - unique
+              - not_null
+
+models:
+  - name: stg_customers
+    description: >
+      Cleaned, renamed, and type-cast version of the raw customers source.
+      Boolean flags replace Yes/No strings. TotalCharges nulls are preserved
+      for zero-tenure customers (expected data quality issue in source).
+    config:
+      tags: ['staging', 'pii_adjacent']
+
+    columns:
+      - name: customer_id
+        description: Natural key from source system.
+        tests:
+          - unique
+          - not_null
+
+      - name: gender
+        description: Customer gender (male/female).
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['male', 'female']
+
+      - name: is_senior_citizen
+        description: 1 if customer is a senior citizen, 0 otherwise.
+        tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+
+      - name: tenure_months
+        description: Number of months the customer has been with the company.
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 120
+
+      - name: contract_type
+        description: Customer contract type.
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['month-to-month', 'one year', 'two year']
+
+      - name: monthly_charges
+        description: Monthly bill amount in USD.
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 200
+
+      - name: total_charges
+        description: >
+          Cumulative charges in USD. NULL is valid for brand-new customers
+          with zero tenure (source system limitation).
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100000
+              where: "total_charges is not null"
+
+      - name: internet_service_type
+        description: Type of internet service; NULL means no internet service.
+        tests:
+          - accepted_values:
+              values: ['dsl', 'fiber optic', null]
+
+      - name: has_churned
+        description: True if the customer has churned; the prediction target.
+        tests:
+          - not_null
+
+      - name: payment_method
+        description: Customer payment method.
+        tests:
+          - not_null
+          - accepted_values:
+              values:
+                - 'electronic check'
+                - 'mailed check'
+                - 'bank transfer (automatic)'
+                - 'credit card (automatic)'
+
+  - name: int_customers_enriched
+    description: "Customer records enriched with derived business features: tenure segmentation,
+      service counts, household profiles, a rule-based churn risk score, and financial
+      metrics. Consumed by all downstream marts."
+
+    columns:
+      - name: customer_id
+        tests:
+          - unique
+          - not_null
+
+      - name: tenure_segment
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['new', 'early', 'developing', 'established', 'loyal']
+
+      - name: contract_length_months
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 12, 24]
+
+      - name: is_auto_pay
+        tests:
+          - not_null
+
+      - name: total_services_subscribed
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 9
+
+      - name: churn_risk_score
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 11
+
+      - name: household_type
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['family', 'couple', 'single_parent', 'single']
+
+      - name: monthly_charges_tier
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['low', 'medium', 'high', 'premium']
+
+      - name: avg_monthly_spend
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 500
+              where: "avg_monthly_spend is not null"
+
+

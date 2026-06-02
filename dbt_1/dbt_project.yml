@@ -1,0 +1,51 @@
+
+# Name your project! Project names should contain only lowercase characters
+# and underscores. A good package name should reflect your organization's
+# name or the intended use of these models
+name: 'dbt_1'
+version: '1.0.0'
+
+# This setting configures which "profile" dbt uses for this project.
+profile: 'dbt_1'
+
+# These configurations specify where dbt should look for different types of files.
+# The `model-paths` config, for example, states that models in this project can be
+# found in the "models/" directory. You probably won't need to change these!
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:         # directories to be removed by `dbt clean`
+  - "target"
+  - "dbt_packages"
+
+vars:
+  # Business logic thresholds
+  churn_risk_high_monthly_charges: 70
+  churn_risk_short_tenure_months: 12
+  senior_citizen_flag: 1
+  # Environment
+  env: "{{ env_var('DBT_ENV', 'dev') }}"
+
+# Configuring models
+# Full documentation: https://docs.getdbt.com/docs/configuring-models
+
+# In this example config, we tell dbt to build all models in the example/
+# directory as views. These settings can be overridden in the individual model
+# files using the `{{ config(...) }}` macro.
+models:
+  dbt_1:
+    # Config indicated by + and applies to all files under models/example/
+    example:
+      +materialized: view
+    churn_data:
+       stg_customers:
+         +materialized: view
+         +schema: staging
+       int_customers_enriched:
+         +materialized: view
+         +schema: intermediate
+
