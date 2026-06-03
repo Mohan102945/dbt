@@ -27,8 +27,6 @@ vars:
   churn_risk_high_monthly_charges: 70
   churn_risk_short_tenure_months: 12
   senior_citizen_flag: 1
-  # Environment
-  env: "{{ env_var('DBT_ENV', 'dev') }}"
 
 # Configuring models
 # Full documentation: https://docs.getdbt.com/docs/configuring-models
