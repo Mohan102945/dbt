@@ -39,11 +39,16 @@ models:
     # Config indicated by + and applies to all files under models/example/
     example:
       +materialized: view
-    churn_data:
+    staging:
        stg_customers:
          +materialized: view
          +schema: staging
+    intermediate:
        int_customers_enriched:
          +materialized: view
          +schema: intermediate
+    marts:
+       +materialized: table
+       +schema: marts
+
 

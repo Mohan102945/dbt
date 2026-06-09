@@ -38,7 +38,7 @@ enriched as (
         has_streaming_movies,
         has_churned,
 
-        -- ── Tenure Segmentation ──────────────────────────────────────────────
+        -- Tenure Segmentation --
         case
             when tenure_months = 0              then 'new'
             when tenure_months between 1 and 12  then 'early'      -- 0–1 yr
@@ -47,7 +47,7 @@ enriched as (
             else                                     'loyal'        -- 4+ yr
         end                                             as tenure_segment,
 
-        -- ── Contract Normalisation ───────────────────────────────────────────
+        -- Contract Normalisation --
         case contract_type
             when 'month-to-month' then 1
             when 'one year'       then 12
@@ -60,7 +60,7 @@ enriched as (
             when 'two year'       then 'long-term'
         end                                             as contract_term_label,
 
-        -- ── Payment Channel ──────────────────────────────────────────────────
+        -- Payment Channel --
         case
             when payment_method in (
                 'bank transfer (automatic)',
@@ -69,7 +69,7 @@ enriched as (
             else false
         end                                             as is_auto_pay,
 
-        -- ── Financial Metrics ────────────────────────────────────────────────
+        --  Financial Metrics --
         -- Impute total_charges for 0-tenure customers
         coalesce(total_charges, monthly_charges)        as total_charges_imputed,
 
@@ -86,7 +86,7 @@ enriched as (
             2
         )                                               as implied_annual_discount,
 
-        -- ── Service Counts ───────────────────────────────────────────────────
+        -- Service Counts --
         (
             case when has_phone_service     then 1 else 0 end
           + case when has_multiple_lines    then 1 else 0 end
@@ -99,7 +99,7 @@ enriched as (
           + case when has_streaming_movies  then 1 else 0 end
         )                                               as total_services_subscribed,
 
-        -- ── Household Profile ────────────────────────────────────────────────
+        -- Household Profile --
         case
             when has_partner and has_dependents     then 'family'
             when has_partner and not has_dependents then 'couple'
@@ -107,7 +107,7 @@ enriched as (
             else                                         'single'
         end                                             as household_type,
 
-        -- ── Churn Risk Score (rule-based) ────────────────────────────────────
+        -- Churn Risk Score (rule-based) --
         -- Composite heuristic; higher = more risk
         (
             -- Contract type risk (highest signal)
@@ -130,7 +130,13 @@ enriched as (
           + case when not coalesce(has_online_security, false)  then 1 else 0 end
           + case when not coalesce(has_tech_support, false)     then 1 else 0 end
             -- Manual / non-sticky payment
-          + case when not is_auto_pay                           then 1 else 0 end
+          + case
+                when payment_method not in (
+                    'bank transfer (automatic)',
+                    'credit card (automatic)'
+                ) then 1
+                else 0
+              end
             -- Senior with fiber (price-sensitive segment)
           + case
                 when is_senior_citizen = 1
@@ -139,7 +145,7 @@ enriched as (
             end
         )                                               as churn_risk_score,
 
-        -- ── Monthly Charges Tier ─────────────────────────────────────────────
+        -- Monthly Charges Tier --
         case
             when monthly_charges < 35  then 'low'
             when monthly_charges < 65  then 'medium'

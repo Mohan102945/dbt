@@ -1,0 +1,113 @@
+version: 2
+
+models:
+  - name: dim_customers
+    description: "Customer dimension with full profile, derived features, and churn label.
+      Grain: one row per customer."
+    config:
+      contract:
+        enforced: false  # set true when dbt contracts are supported by your adapter
+
+    columns:
+      - name: customer_sk
+        description: Surrogate key
+        tests:
+          - unique
+          - not_null
+
+      - name: customer_id
+        description: Natural key from source.
+        tests:
+          - unique
+          - not_null
+
+      - name: churn_risk_label
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['low', 'medium', 'high', 'critical']
+
+      - name: total_services_subscribed
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 9
+
+      - name: has_churned
+        tests:
+          - not_null
+
+  - name: fct_churn_events
+    description: "One row per churned customer. Revenue impact metrics calculated at
+      the time of churn. Grain: one churn event per customer."
+
+    columns:
+      - name: churn_event_sk
+        tests:
+          - unique
+          - not_null
+
+      - name: customer_id
+        tests:
+          - unique
+          - not_null
+          - relationships:
+              to: ref('dim_customers')
+              field: customer_id
+
+      - name: lifetime_revenue
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+
+      - name: monthly_revenue_lost
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+
+  - name: agg_revenue_summary
+    description: "Single-row revenue health snapshot. MRR, churn impact, LTV, and
+        at-risk revenue for the full customer base."
+
+  - name: agg_service_adoption
+    description: "Per-service adoption rates and churn comparison between subscribers
+        and non-subscribers. Grain: one row per service type."
+
+    columns:
+        - name: service_name
+          tests:
+            - unique
+            - not_null
+
+        - name: adoption_rate_pct
+          tests:
+            - dbt_utils.accepted_range:
+                min_value: 0
+                max_value: 100
+
+  - name: agg_churn_by_segment
+    description: "Churn metrics aggregated across 6 business dimensions.
+        Grain: one row per (segment_dimension, segment_value)."
+
+    columns:
+        - name: segment_sk
+          tests:
+            - unique
+            - not_null
+
+        - name: churn_rate_pct
+          tests:
+            - not_null
+            - dbt_utils.accepted_range:
+                min_value: 0
+                max_value: 100
+
+        - name: retention_rate_pct
+          tests:
+            - not_null
+            - dbt_utils.accepted_range:
+                min_value: 0
+                max_value: 100
